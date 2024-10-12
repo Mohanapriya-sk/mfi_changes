@@ -220,6 +220,39 @@
 			}
 		});
 
+		function toggleDocumentNames() {
+			var noOfLoanApplications = $('#no_of_loan_application_documents').val();
+
+			if (parseInt(noOfLoanApplications) > 0) {
+				$('#document_names_row').show();
+			} else {
+				$('#document_names_row').hide();
+			}
+		}
+		function validateForm() {
+			var noOfLoanApplications = parseInt($('#no_of_loan_application_documents').val());
+			var documentNames = $('#document_names').val();
+			var documentNamesArray = documentNames.split(',').map(name => name.trim());
+
+			if (noOfLoanApplications > 0 && documentNamesArray.length !== noOfLoanApplications) {
+				$('#document_names_error').show();
+				return false;
+			} else {
+				$('#document_names_error').hide();
+				return true;
+			}
+		}
+
+		$(document).ready(function () {
+			toggleDocumentNames();
+
+			$('#no_of_loan_application_documents').on('change', toggleDocumentNames);
+			$('#configuration_form').on('submit', function (event) {
+				if (!validateForm()) {
+					event.preventDefault();
+				}
+			});
+		});
 		function submit_form(form_id) {
 
 			var forms = $('#' + form_id);
@@ -1928,8 +1961,100 @@
 			}
 
 		}
-	}
 
+		function removeFile(index, fileName, la_id) {
+			// SweetAlert confirmation
+			Swal.fire({
+				title: 'Are you sure?',
+				text: "You won't be able to revert this!",
+				icon: 'warning',
+				showCancelButton: true,
+				confirmButtonColor: '#3085d6',
+				cancelButtonColor: '#d33',
+				confirmButtonText: 'Yes, delete it!'
+			}).then((result) => {
+				if (result.value) {
+					show_loader();
+
+					// Perform the AJAX call to delete the file
+					$.ajax({
+						url: base_url + '/admin/delete_loan_application_document',
+						type: 'POST',
+						data: {
+							index: index, // Pass the file index
+							file_name: fileName,
+							la_id: la_id
+						},
+						success: function (response) {
+							if (response.success) {
+								hide_loader();
+								Swal.fire({
+									title: 'Deleted!',
+									text: 'File has been deleted.',
+									icon: 'success'
+								}).then(() => {
+									// Replace the file link with an input file element
+									// $('#file-' + index).html('<input type="file" class="form-control" name="document_uploads[' + index + ']" id="document_' + index + '" accept=".pdf,.doc,.docx,.jpg,.png" />');
+									// Reload the page after the deletion is processed
+									window.location.reload();
+								});
+							} else {
+								Swal.fire({
+									title: 'Error!',
+									text: 'Error removing file: ' + response.message,
+									icon: 'error'
+								});
+							}
+						},
+						error: function (xhr, status, error) {
+							console.log('Error:', error);
+							Swal.fire({
+								title: 'Error!',
+								text: 'An error occurred while removing the file.',
+								icon: 'error'
+							});
+						}
+					});
+				}
+			});
+		}
+
+		function submit_form(form_id) {
+			// $('#'+form_id).submit();					
+			var formData = new FormData($('#' + form_id)[0]); // Use FormData to capture all form inputs, including files
+			var form = $('#' + form_id);
+			var actionUrl = form.attr('action');
+
+			$.ajax({
+				url: actionUrl,
+				type: 'POST',
+				data: formData,
+				contentType: false,
+				processData: false,
+				success: function (response) {
+
+					Swal.fire({
+						title: "Success",
+						text: "Your form has been submitted successfully!",
+						type: "success"
+					}).then(function () {
+						// window.location.reload();
+						window.location.href = base_url + '/admin/loan_application';
+					});
+				},
+				error: function (xhr, status, error) {
+					console.error("Form submission error:", error);
+					Swal.fire({
+						title: "Error",
+						text: "There was an error submitting your form.",
+						type: "error"
+					});
+				}
+			});
+
+
+		}
+	}
 
 
 	$(document).on('show.bs.modal', '#scrolling_modal', function (e) {

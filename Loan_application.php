@@ -31,6 +31,8 @@ class Loan_application extends BaseController
 
         $this->branch_child_arr = explode(',', $this->branch_child);
 
+        $this->loan_application_documents_uploadPath = FCPATH . 'uploads/application_documents/';
+
     }
 
     public function index()
@@ -319,6 +321,57 @@ class Loan_application extends BaseController
         }
 
         echo json_encode($json_data);
+    }
+
+    public function deleteFile()
+    {
+        $index = $this->request->getPost('index');
+        $fileName = $this->request->getPost('file_name');
+        $la_id = $this->request->getPost('la_id');
+        log_message('info', 'Uploaded files: ' . $index . $fileName . $la_id);
+
+
+        $filePath = $this->loan_application_documents_uploadPath . $fileName;
+
+        log_message('info', 'Uploaded filePath: ' . $filePath);
+        $existingDocumentsQuery = $this->model->query("SELECT la_loan_application_documents FROM `loan_application` WHERE la_deleted = 'no' AND la_id = ?", [$la_id]);
+        $result = $existingDocumentsQuery->getResultArray();
+
+        if (!empty($result)) {
+            $existingDocuments = $result[0]['la_loan_application_documents'];
+            log_message('info', 'Existing documents: ' . $existingDocuments);
+
+
+            $fileNames = explode(',', $existingDocuments);
+
+
+            foreach ($fileNames as $key => $value) {
+                if ($value === $fileName) {
+                    $fileNames[$key] = '';
+                }
+            }
+
+
+            $updatedFileNamesString = implode(',', $fileNames);
+            log_message('info', 'Updated file names: ' . $updatedFileNamesString);
+
+            $this->model->query("UPDATE `loan_application` SET la_loan_application_documents = ? WHERE la_id = ?", [$updatedFileNamesString, $la_id]);
+
+            if (file_exists($filePath)) {
+                if (unlink($filePath)) {
+                    log_message('info', 'File deleted from server: ' . $fileName);
+                } else {
+                    log_message('error', 'Unable to delete the file from the server: ' . $fileName);
+                    return $this->response->setJSON(['success' => false, 'message' => 'Unable to delete the file from the server.']);
+                }
+            } else {
+                log_message('info', 'File not found on the server, but reference is removed from the database.');
+            }
+
+            return $this->response->setJSON(['success' => true, 'message' => 'File reference deleted successfully.']);
+        } else {
+            return $this->response->setJSON(['success' => false, 'message' => 'Loan application not found.']);
+        }
 
     }
 
@@ -430,6 +483,41 @@ class Loan_application extends BaseController
             $data['staff_list'] = $this->model->query("select employee_id,employee_name,employee_code from employee_position join employee on FIND_IN_SET(employee_id,employee_position_employee_id) > 0 and employee_status != 'relieved' and employee_deleted = 'no' where employee_position_branch_id = '$branch_id' and employee_position_id in (" . session()->get('position_child') . ") and employee_id in (" . session()->get('employee_child') . ") and employee_status!='relieved' and employee_deleted = 'no' group by employee_id order by employee_name asc")->getResult('array');
         }
         $data['enable_collection_slot'] = get_config_value('enable_collection_slot');
+
+        $uploaded_files = [];
+        if (isset($data['edit_details']['la_loan_application_documents']) && !empty($data['edit_details']['la_document_names'])) {
+            $document_file_names = explode(',', $data['edit_details']['la_loan_application_documents']);
+
+            foreach ($document_file_names as $fileName) {
+                $uploaded_files[] = $fileName;
+            }
+        }
+        if (isset($data['edit_details']['la_document_names']) && !empty($data['edit_details']['la_document_names'])) {
+
+            $document_names = $data['edit_details']['la_document_names'];
+            $document_names_array = explode(',', $document_names);
+            $no_of_documents = (int) $data['edit_details']['la_no_of_documents'];
+        } else {
+
+            $document_names = get_config_value('document_names');
+            $document_names_array = explode(',', $document_names);
+            $no_of_documents = 0;
+        }
+        if ($no_of_documents == 0) {
+            $no_of_documents = (int) get_config_value('no_of_loan_application_documents');
+        }
+
+        $data['uploaded_files'] = $uploaded_files;
+
+        $document_names = get_config_value('document_names');
+        // $document_names_array = explode(',', $document_names);
+        // $data['no_of_loan_application_documents'] = get_config_value('no_of_loan_application_documents');
+        // $data['document_names'] = array_slice($document_names_array, 0, (int)$data['no_of_loan_application_documents']);
+
+        $data['document_names'] = array_slice($document_names_array, 0, $no_of_documents);
+        $data['no_of_loan_application_documents'] = $no_of_documents;
+
+
         $this->page_group = 'form';
         $this->arr_data = $data;
         return view('admin/loan_application/form', $this->format_data());
@@ -550,6 +638,43 @@ class Loan_application extends BaseController
 
                 $data['la_no'] = ((int) $la_no == 0 || $la_no == "") ? '1001' : (int) $la_no + 1;
 
+
+
+                // $document_uploads = $this->request->getFileMultiple('document_uploads');
+                $uploaded_files = [];
+
+                $document_uploads = $this->request->getFiles();
+                $document_names = '';
+                // log_message('info', 'Request document_uploads: ' . print_r($document_uploads, true));
+                if (!empty($document_uploads))
+                // log_message('info', 'Uploaded files: ' . print_r($_FILES, true));
+                {
+                    $document_names = get_config_value('document_names');
+
+                    foreach ($document_uploads['document_uploads'] as $file) {
+                        if ($file->isValid() && !$file->hasMoved()) {
+
+                            $fileName = $data['la_no'] . $file->getRandomName();
+                            if (in_array($file->getClientMimeType(), ['image/jpeg', 'image/png', 'image/jpg'])) {
+                                $image = \Config\Services::image()
+                                    ->withFile($file)
+                                    ->save($this->loan_application_documents_uploadPath . $fileName);
+                            } else {
+                                $file->move($this->loan_application_documents_uploadPath, $fileName);
+                            }
+
+
+
+                            $uploaded_files[] = $fileName;
+                        }
+
+                    }
+                }
+                // Prepare data for saving to DB
+                $data['la_loan_application_documents'] = implode(',', $uploaded_files);
+                $data['la_document_names'] = $document_names;
+                $data['la_no_of_documents'] = count($uploaded_files);
+
                 $this->model->insert($data);
 
                 $ins_id = $this->model->insertID();
@@ -591,11 +716,60 @@ class Loan_application extends BaseController
 
                 }
             } else {
+
+                // $document_uploads = $this->request->getFileMultiple('document_uploads');
+                $uploaded_files = [];
+
+                $document_uploads = $this->request->getFiles();
+                $document_names = '';
+                $existing_documents = [];
+                $document_names = '';
+                $existingDocumentsQuery = $this->model->query("SELECT la_loan_application_documents, la_document_names FROM `loan_application` WHERE la_id = ?", [$id]);
+                $result = $existingDocumentsQuery->getRowArray();
+                if (!empty($result['la_loan_application_documents'])) {
+                    // Convert existing document files into an array
+                    $existing_documents = explode(',', $result['la_loan_application_documents']);
+                    $uploaded_files = $existing_documents; // Initialize uploaded files with existing documents
+                }
+                $document_names = $result['la_document_names'] ?? get_config_value('document_names');
+                // log_message('info', 'Request document_uploads: ' . print_r($document_uploads, true));
+                if (!empty($document_uploads))
+                // log_message('info', 'Uploaded files: ' . print_r($_FILES, true));
+                {
+                    // $document_names = get_config_value('document_names');
+
+                    foreach ($document_uploads['document_uploads'] as $index => $file) {
+                        if ($file->isValid() && !$file->hasMoved()) {
+
+                            $fileName = $id . $file->getRandomName();
+                            if (in_array($file->getClientMimeType(), ['image/jpeg', 'image/png', 'image/jpg'])) {
+                                $image = \Config\Services::image()
+                                    ->withFile($file)
+                                    ->save($this->loan_application_documents_uploadPath . $fileName);
+                            } else {
+                                $file->move($this->loan_application_documents_uploadPath, $fileName);
+                            }
+
+
+
+                            $uploaded_files[$index] = $fileName;
+                        }
+
+                    }
+                }
+                // Prepare data for saving to DB
+                $data['la_loan_application_documents'] = implode(',', $uploaded_files);
+                $data['la_document_names'] = $document_names;
+                $data['la_no_of_documents'] = count($uploaded_files);
                 unset($data['la_date']);
                 $data['la_total_amount'] = $data['la_sanctioned_amount'] ?? $data['la_total_amount'];
                 if ($data['la_status'] == 'hold') {
 
-                    $this->model->query("update loan_application set la_collection_slot='$data[la_collection_slot]',la_status = 'hold',la_approval_stage_employee_id='$action_emp_id',la_action_taken_position_id='$action_pos_id',la_status_description='$data[la_status_description]' where la_id = '$id'");
+                    $this->model->query("update loan_application set la_collection_slot='$data[la_collection_slot]',la_status = 'hold',la_approval_stage_employee_id='$action_emp_id',la_action_taken_position_id='$action_pos_id',la_status_description='$data[la_status_description]',
+                        la_loan_application_documents = '$data[la_loan_application_documents]', 
+                        la_document_names = '$data[la_document_names]', 
+                        la_no_of_documents = '$data[la_no_of_documents]' 
+                        where la_id = '$id'");
                 } else {
                     $this->model->update($id, $data);
                 }
