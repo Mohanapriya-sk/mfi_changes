@@ -28,8 +28,7 @@
 							<label for="branch_name">Cash Inflow Label</label>
 							<font color='red'>*</font>
 							<input class='form-control' type="text" name="cash_inflow" id="cash_inflow" required
-								placeholder="Cash Inflow Lable"
-								value="<?php echo $configuration["cash_inflow"] ?? '' ?>">
+								placeholder="Cash Inflow Lable" value="<?php echo $configuration["cash_inflow"] ?? '' ?>">
 						</div>
 					</div>
 
@@ -109,7 +108,33 @@
 						</div>
 					</div>
 
+					<div class="form-row">
+						<div class="form-group col-md-4">
+							<label for="no_of_loan_application_documents">No. of Loan Applications</label>
+							<font color='red'>*</font>
+							<select class='form-control' name="no_of_loan_application_documents"
+								id="no_of_loan_application_documents" required onchange="toggleDocumentNames()">
+								<?php for ($i = 0; $i <= 10; $i++): ?>
+									<option value="<?= $i ?>" <?php if (isset($configuration['no_of_loan_application_documents']) && $configuration['no_of_loan_application_documents'] == $i)
+										  echo 'selected' ?>>
+										<?= $i ?>
+									</option>
+								<?php endfor; ?>
+							</select>
+						</div>
+					</div>
 
+					<div class="form-row" id="document_names_row" style="display: none;">
+						<div class="form-group col-md-4">
+							<label for="document_names">Document Names</label>
+							<font color='red'>*</font>
+							<input class='form-control' type="text" name="document_names" id="document_names"
+								placeholder="Enter document names"
+								value="<?php echo $configuration["document_names"] ?? '' ?>">
+							<small class="form-text text-danger" id="document_names_error" style="display: none;">Number
+								of document names must match the number of loan applications.</small>
+						</div>
+					</div>
 
 				</div>
 				<div class="card-footer bg-light text-right">

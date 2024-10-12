@@ -12,10 +12,9 @@
 		<?php endif; ?>
 		<div class="card">
 
-			<form method="POST" action="<?php echo $save_url ?? '' ?>" novalidate id="loan_application_form">
+		<form method="POST" action="<?php echo $save_url ?? '' ?>" novalidate id="loan_application_form"
+				accept-charset="utf-8" enctype="multipart/form-data">			
 				<div class="card-body">
-
-
 					<input type="hidden" name="la_id" value="<?php echo $edit_details['la_id'] ?? '0'; ?>">
 					<input type="hidden" id="la_approval_stage" name="la_approval_stage"
 						value="<?php echo $loan_approval_stage['loan_approval_stage_id'] ?? '0'; ?>">
@@ -55,7 +54,7 @@
 
 							<select class='form-control get_employee_based_on_branch'
 								replace_id="la_applied_by_employee_id" <?php if (!isset($edit_details['la_branch_id'])) { ?> name="la_branch_id" <?php } ?> id="la_branch_id" required <?php if (isset($edit_details['la_loan_type']))
-										   echo "disabled"; ?>>
+										 echo "disabled"; ?>>
 								<option value="">Select Branch</option>
 								<?php
 
@@ -78,7 +77,7 @@
 							<font color='red'>*</font>
 							<select class='form-control' <?php if (!isset($edit_details['la_branch_id'])) { ?>
 									name="la_loan_type" <?php } ?>id="la_loan_type" required <?php if (isset($edit_details['la_loan_type']))
-										  echo "disabled"; ?>>
+										 echo "disabled"; ?>>
 								<option value="">Select Loan Type</option>
 								<?php
 								if (isset($loan_type)) {
@@ -140,8 +139,7 @@
 								if (isset($staff_list)) {
 									foreach ($staff_list as $s_key => $s_val) { ?>
 										<option value='<?php echo $s_val['employee_id'] ?>' <?php if (isset($edit_details['la_applied_by_employee_id']) && $edit_details['la_applied_by_employee_id'] == $s_val['employee_id'])
-											   echo 'selected' ?>><?php echo $s_val['employee_name'] . " [" . $s_val['employee_code'] . "]" ?>
-										</option>
+											   echo 'selected' ?>><?php echo $s_val['employee_name'] . " [" . $s_val['employee_code'] . "]" ?></option>
 									<?php }
 									?>
 								<?php } ?>
@@ -168,8 +166,7 @@
 										foreach ($staff_list as $s_key => $s_val) { ?>
 											<option value='<?php echo $s_val['employee_id'] ?>' <?php if (isset($edit_details['la_collection_staff']) && $edit_details['la_collection_staff'] == $s_val['employee_id'])
 												   echo 'selected' ?>>
-												<?php echo $s_val['employee_name'] . " [" . $s_val['employee_code'] . "]" ?>
-											</option>
+												<?php echo $s_val['employee_name'] . " [" . $s_val['employee_code'] . "]" ?></option>
 										<?php }
 										?>
 									<?php } ?>
@@ -181,6 +178,69 @@
 							</div>
 						</div>
 					<?php } ?>
+					
+					<?php if ($enable_collection_slot == 'yes') { ?>
+						<div class="form-row">
+							<div class="form-group col-md-4">
+								<label for="la_branch_id">Collection Slot</label>
+								<font color='red'>*</font>
+								<select style="width: 100%" class='form-control' name="la_collection_slot"
+									id="la_collection_slot" required>
+									<option value="1" <?php if (isset($edit_details['la_collection_slot']) && $edit_details['la_collection_slot'] == "1")
+										echo 'selected' ?>>AM1</option>
+										<option value="2" <?php if (isset($edit_details['la_collection_slot']) && $edit_details['la_collection_slot'] == "2")
+										echo 'selected' ?>>AM2</option>
+										<option value="3" <?php if (isset($edit_details['la_collection_slot']) && $edit_details['la_collection_slot'] == "3")
+										echo 'selected' ?>>PM1</option>
+										<option value="4" <?php if (isset($edit_details['la_collection_slot']) && $edit_details['la_collection_slot'] == "4")
+										echo 'selected' ?>>PM2</option>
+									</select>
+								</div>
+							</div>
+					<?php } ?>
+										
+					<?php if ($no_of_loan_application_documents > 0): ?>
+						<div class="form-row">
+							<div class="form-group col-md-8">
+								<table class="table table-striped table-bordered" style="width:100%">
+									<tbody>
+										<?php foreach ($document_names as $index => $document_name): ?>
+											<?php
+											// Generate an ID from the document name by replacing spaces with underscores
+											$document_id = str_replace(' ', '_', htmlspecialchars($document_name));
+											?>
+											<tr>
+												<td><?php echo htmlspecialchars(ucwords($document_name)); ?></td>
+												<td>
+													<?php if (isset($uploaded_files[$index]) && !empty($uploaded_files[$index])): ?>
+
+														<a href="<?php echo base_url('./uploads/application_documents/' . $uploaded_files[$index]); ?>"
+															target="_blank">
+															<?php echo htmlspecialchars(ucwords($document_name)); ?>
+														</a>
+														<input type="hidden" name="uploaded_files[<?php echo $index; ?>]" value="<?php echo htmlspecialchars($uploaded_files[$index]); ?>">
+													<?php else: ?>
+														<input type="file" class="form-control"
+															name="document_uploads[<?php echo $index; ?>]"
+															id="<?php echo $document_id; ?>" accept=".pdf,.doc,.docx,.jpg,.png" />
+													<?php endif; ?>
+												</td>
+												<td>
+													<?php if (isset($uploaded_files[$index]) && !empty($uploaded_files[$index])): ?>
+														<a href="#"
+															onclick="removeFile(<?php echo $index; ?>, '<?php echo $uploaded_files[$index]; ?>', '<?php echo $edit_details['la_id'] ?? '0'; ?>')">
+															<i class="la la-trash" style="font-size: 20px;color: red;"></i>
+														</a>
+													<?php endif; ?>
+												</td>
+											</tr>
+										<?php endforeach; ?>
+									</tbody>
+								</table>
+							</div>
+						</div>
+					<?php endif; ?>
+
 
 					<div class="form-row">
 						<div class="form-group col-md-4">
@@ -241,25 +301,6 @@
 							</select>
 						</div>
 					</div>
-					<?php if ($enable_collection_slot == 'yes') { ?>
-						<div class="form-row">
-							<div class="form-group col-md-4">
-								<label for="la_branch_id">Collection Slot</label>
-								<font color='red'>*</font>
-								<select style="width: 100%" class='form-control' name="la_collection_slot"
-									id="la_collection_slot" required>
-									<option value="1" <?php if (isset($edit_details['la_collection_slot']) && $edit_details['la_collection_slot'] == "1")
-										echo 'selected' ?>>AM1</option>
-										<option value="2" <?php if (isset($edit_details['la_collection_slot']) && $edit_details['la_collection_slot'] == "2")
-										echo 'selected' ?>>AM2</option>
-										<option value="3" <?php if (isset($edit_details['la_collection_slot']) && $edit_details['la_collection_slot'] == "3")
-										echo 'selected' ?>>PM1</option>
-										<option value="4" <?php if (isset($edit_details['la_collection_slot']) && $edit_details['la_collection_slot'] == "4")
-										echo 'selected' ?>>PM2</option>
-									</select>
-								</div>
-							</div>
-					<?php } ?>
 					<div class="form-row">
 						<div class="form-group col-md-4">
 							<label for="la_reject_reason">Description</label>
